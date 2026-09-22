@@ -1,0 +1,9 @@
+fastapi==0.136.3
+uvicorn==0.49.0
+pydantic==2.13.4
+openai==2.41.1
+python-dotenv==1.2.2
+pyahocorasick==2.3.1
+
+# 接口测试脚本使用（src/back/api_test.py，非服务端运行必需）
+requests==2.34.2

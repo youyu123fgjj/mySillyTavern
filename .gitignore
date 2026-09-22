@@ -1,0 +1,7 @@
+/src/frontend/node_modules/
+/src/frontend/dist/
+/src/doc/
+/.idea/
+/.Vir/
+/src/back/test.db
+/src/back/.env
