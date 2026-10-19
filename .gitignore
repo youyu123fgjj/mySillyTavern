@@ -5,3 +5,4 @@
 /.Vir/
 /src/back/test.db
 /src/back/.env
+*.txt

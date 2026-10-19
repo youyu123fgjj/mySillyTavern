@@ -1,13 +1,12 @@
-from openai import OpenAI
-
+from openai import AsyncOpenAI
 from src.back.config import api_key, base_url, model_name
 
-ds = OpenAI(api_key=api_key, base_url=base_url)
+ds = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
 
-def stream_dialogue(history, temperature: max = 0.7, max_tokens: int = 2048, usage_box: dict = None):
+async def stream_dialogue(history, temperature: max = 0.7, max_tokens: int = 2048, usage_box: dict = None):
     """
-    流式请求模型，逐字 yield 文本。
+    （原子）流式请求模型，逐字 yield 文本。
     usage_box 传入一个 dict，流结束后会把 token 用量写进去（供日志回填），
     :param history: 会话历史，拼接成了一整个字符串
     :param temperature: 设定温度值
@@ -15,19 +14,15 @@ def stream_dialogue(history, temperature: max = 0.7, max_tokens: int = 2048, usa
     :param usage_box:
     :return: 生成器，流式返回模型的回复。对python程序调用方不可见
     """
-    print(usage_box)
-    stream = ds.chat.completions.create(
+    # print(usage_box)
+    stream = await ds.chat.completions.create(
         model=model_name,
         messages=history,
         stream=True,
         temperature=temperature,
-        # max_tokens=max_tokens,
-        extra_body={
-            "thinking": {"type": "disabled"}
-        }
+        extra_body={"thinking": {"type": "disabled"}},
     )
-    for chunk in stream:
-        # 带 usage 的那个 chunk 的 choices 为空列表，必须先判断再取
+    async for chunk in stream:  # ← async for
         if chunk.usage and usage_box is not None:
             usage_box["prompt_tokens"] = chunk.usage.prompt_tokens
             usage_box["completion_tokens"] = chunk.usage.completion_tokens
@@ -36,7 +31,7 @@ def stream_dialogue(history, temperature: max = 0.7, max_tokens: int = 2048, usa
             yield chunk.choices[0].delta.content
 
 
-def summarize_dialogue(history_text: str, old_memory: str, temperature: int = 0, max_tokens: int = 1024) -> str:
+async def summarize_dialogue(history_text: str, old_memory: str, temperature: int = 0, max_tokens: int = 1024) -> str:
     """
     非流式滚动摘要：把待折叠段对话 + 旧前情压缩成新的前情提要（二轮 D15）
     :param history_text: 会话历史，拼接成了一整个字符串
@@ -56,7 +51,7 @@ def summarize_dialogue(history_text: str, old_memory: str, temperature: int = 0,
         f"\n\n旧的前情提要：\n{old_memory or '（无）'}"
         f"\n\n待总结的对话：\n{history_text}"
     )
-    resp = ds.chat.completions.create(
+    resp = await ds.chat.completions.create(
         model=model_name,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         temperature=temperature,

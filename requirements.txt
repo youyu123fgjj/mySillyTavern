@@ -7,3 +7,5 @@ pyahocorasick==2.3.1
 
 # 接口测试脚本使用（src/back/api_test.py，非服务端运行必需）
 requests==2.34.2
+
+dotenv~=0.9.9

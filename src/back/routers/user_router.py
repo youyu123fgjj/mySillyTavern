@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends
 from uuid import uuid4
 from hashlib import md5
 
+from src.back.SQLiteConnectionPool import get_connection, transaction
 from src.back.request_entity import User, UserSettings
-from src.back.tools.tools import ok_response, get_connection, transaction, authentication
+from src.back.tools.tools import ok_response, authentication
 
 ur = APIRouter(prefix="/user")
 

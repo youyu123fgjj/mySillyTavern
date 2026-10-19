@@ -1,8 +1,9 @@
 from uuid import uuid4
 from fastapi import Depends, APIRouter
 
+from src.back.SQLiteConnectionPool import get_connection, transaction
 from src.back.request_entity import ReviewApply, ReviewAudit, EmptyRequest
-from src.back.tools.tools import authentication, admin_authentication, ok_response, get_connection, transaction
+from src.back.tools.tools import authentication, admin_authentication, ok_response
 
 rr = APIRouter(prefix="/review")
 
@@ -13,7 +14,7 @@ TARGET_TABLES = {
 }
 
 
-def check_target(target_type, target_id, user_id, conn):
+async def check_target(target_type, target_id, user_id, conn):
     """校验目标类型合法、目标存在且申请人为创建者，返回当前 visibility"""
     table = TARGET_TABLES.get(target_type)
     if table is None:
@@ -26,7 +27,7 @@ def check_target(target_type, target_id, user_id, conn):
 
 
 @rr.post("/apply")
-def apply_public(request: ReviewApply, conn=Depends(get_connection), user_id=Depends(authentication)):
+async def apply_public(request: ReviewApply, conn=Depends(get_connection), user_id=Depends(authentication)):
     """创建者申请将角色卡或知识库转为公用"""
     with transaction(conn):
         if check_target(request.target_type, request.target_id, user_id, conn) == "public":
@@ -48,9 +49,9 @@ def apply_public(request: ReviewApply, conn=Depends(get_connection), user_id=Dep
 
 
 @rr.post("/status")
-def review_status(request: ReviewApply, conn=Depends(get_connection), user_id=Depends(authentication)):
+async def review_status(request: ReviewApply, conn=Depends(get_connection), user_id=Depends(authentication)):
     """创建者查询自己提交的审核状态与结果"""
-    check_target(request.target_type, request.target_id, user_id, conn)
+    await check_target(request.target_type, request.target_id, user_id, conn)
     row = conn.execute("SELECT status, warning, applied_at, approved_at FROM public_reviews "
                        "WHERE target_type=(?) AND target_id=(?)",
                        (request.target_type, request.target_id)).fetchone()
@@ -67,7 +68,7 @@ def review_status(request: ReviewApply, conn=Depends(get_connection), user_id=De
 
 
 @rr.post("/target_info")
-def target_info(request: ReviewApply, conn=Depends(get_connection), admin=Depends(admin_authentication)):
+async def target_info(request: ReviewApply, conn=Depends(get_connection), admin=Depends(admin_authentication)):
     """管理员查看待审目标的完整详情（角色卡/知识库），仅本机可访问，不妨碍审核前了解内容"""
     if request.target_type == "character":
         info = conn.execute("SELECT id, user_id, name, system_prompt, opening_remarks, visibility, "
@@ -97,7 +98,7 @@ def target_info(request: ReviewApply, conn=Depends(get_connection), admin=Depend
 
 
 @rr.post("/pending_list")
-def pending_list(request: EmptyRequest, conn=Depends(get_connection), admin=Depends(admin_authentication)):
+async def pending_list(request: EmptyRequest, conn=Depends(get_connection), admin=Depends(admin_authentication)):
     """管理员获取待审核列表，仅本机可访问"""
     rows = conn.execute("SELECT target_type, target_id, user_id, applied_at FROM public_reviews "
                         "WHERE status='pending' ORDER BY applied_at").fetchall()
@@ -107,7 +108,7 @@ def pending_list(request: EmptyRequest, conn=Depends(get_connection), admin=Depe
 
 
 @rr.post("/audit")
-def audit(request: ReviewAudit, conn=Depends(get_connection), admin=Depends(admin_authentication)):
+async def audit(request: ReviewAudit, conn=Depends(get_connection), admin=Depends(admin_authentication)):
     """管理员审核，仅本机可访问。通过则同步将目标 visibility 改为 public"""
     table = TARGET_TABLES.get(request.target_type)
     if table is None:
